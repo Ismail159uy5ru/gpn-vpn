@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
+import 'package:hiddify/features/gpn/ui/screens/emergency_vpn_screen.dart';
 import 'package:hiddify/features/gpn/ui/screens/gpn_shell.dart';
-import 'package:hiddify/features/gpn/ui/screens/login_screen.dart';
+import 'package:hiddify/features/gpn/ui/screens/welcome_screen.dart';
+import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/services/session_store.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
-/// Вход 6 цифр → личный кабинет (общий с ботом).
+/// Стартовый экран → кабинет или аварийный VPN.
 class GpnRoot extends ConsumerStatefulWidget {
   const GpnRoot({super.key});
 
@@ -16,7 +18,10 @@ class GpnRoot extends ConsumerStatefulWidget {
 
 class _GpnRootState extends ConsumerState<GpnRoot> {
   final _session = SessionStore();
+  final _deviceId = DeviceIdStore();
   String? _token;
+  GpnSessionKind _kind = GpnSessionKind.cabinet;
+  String _emergencyUrl = '';
   bool _loading = true;
 
   @override
@@ -27,9 +32,13 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
 
   Future<void> _loadSession() async {
     final token = await _session.loadToken();
+    final kind = await _session.loadKind();
+    final emergencyUrl = await _session.loadEmergencyUrl();
     if (!mounted) return;
     setState(() {
       _token = token;
+      _kind = kind;
+      _emergencyUrl = emergencyUrl ?? '';
       _loading = false;
     });
   }
@@ -38,20 +47,47 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
     String token, {
     int? telegramId,
     String? subscriptionUrl,
+    GpnSessionKind kind = GpnSessionKind.cabinet,
   }) async {
-    await _session.saveToken(token, telegramId: telegramId);
+    await _session.saveToken(
+      token,
+      telegramId: telegramId,
+      kind: kind,
+      emergencyUrl: kind == GpnSessionKind.emergency ? subscriptionUrl : null,
+    );
     if (subscriptionUrl != null && subscriptionUrl.isNotEmpty) {
+      if (kind == GpnSessionKind.emergency) {
+        setState(() {
+          _token = token;
+          _kind = kind;
+          _emergencyUrl = subscriptionUrl;
+        });
+        return;
+      }
       await GpnVpnBridge.importSubscription(ref, subscriptionUrl);
     }
     if (!mounted) return;
-    setState(() => _token = token);
+    setState(() {
+      _token = token;
+      _kind = kind;
+      if (subscriptionUrl != null) _emergencyUrl = subscriptionUrl;
+    });
   }
 
   Future<void> _logout() async {
     await GpnVpnBridge.disconnect(ref);
     await _session.clear();
     if (!mounted) return;
-    setState(() => _token = null);
+    setState(() {
+      _token = null;
+      _kind = GpnSessionKind.cabinet;
+      _emergencyUrl = '';
+    });
+  }
+
+  Future<GpnClient> _client() async {
+    final id = await _deviceId.getOrCreate();
+    return GpnClient(appToken: _token, deviceId: id);
   }
 
   @override
@@ -60,11 +96,25 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
       return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
     if (_token == null || _token!.isEmpty) {
-      return LoginScreen(onLoggedIn: _onLoggedIn);
+      return WelcomeScreen(onLoggedIn: _onLoggedIn);
     }
-    return GpnShell(
-      client: GpnClient(appToken: _token),
-      onLogout: _logout,
+    if (_kind == GpnSessionKind.emergency) {
+      return EmergencyVpnScreen(
+        initialUrl: _emergencyUrl,
+        onExit: _logout,
+      );
+    }
+    return FutureBuilder<GpnClient>(
+      future: _client(),
+      builder: (context, snap) {
+        if (!snap.hasData) {
+          return const Scaffold(body: Center(child: CircularProgressIndicator()));
+        }
+        return GpnShell(
+          client: snap.data!,
+          onLogout: _logout,
+        );
+      },
     );
   }
 }

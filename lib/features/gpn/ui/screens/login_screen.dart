@@ -12,9 +12,14 @@ typedef GpnLoggedInCallback = void Function(
 });
 
 class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key, required this.onLoggedIn});
+  const LoginScreen({
+    super.key,
+    required this.onLoggedIn,
+    this.title = 'Вход через Telegram',
+  });
 
   final GpnLoggedInCallback onLoggedIn;
+  final String title;
 
   @override
   State<LoginScreen> createState() => _LoginScreenState();
@@ -49,19 +54,9 @@ class _LoginScreenState extends State<LoginScreen> {
     await _finishAuth((c) => c.loginWithCode(_code));
   }
 
-  /// Аварийный: с кодом — сразу профиль 1ч на сервере; без кода — открыть бота.
-  Future<void> _emergency() async {
-    if (_code.length == 6) {
-      await _finishAuth((c) => c.emergencyWithCode(_code), isEmergency: true);
-      return;
-    }
-    await _openTelegram(start: 'app_emergency');
-  }
-
   Future<void> _finishAuth(
-    Future<GpnAuthSession> Function(GpnClient) call, {
-    bool isEmergency = false,
-  }) async {
+    Future<GpnAuthSession> Function(GpnClient) call,
+  ) async {
     setState(() {
       _busy = true;
       _error = null;
@@ -75,11 +70,6 @@ class _LoginScreenState extends State<LoginScreen> {
         telegramId: session.telegramId,
         subscriptionUrl: sub.isNotEmpty ? sub : null,
       );
-      if (isEmergency && mounted && sub.isNotEmpty) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Профиль на 1 ч создан. VPN можно включить на главной.')),
-        );
-      }
     } on GpnApiException catch (e) {
       setState(() => _error = e.message);
     } catch (_) {
@@ -111,7 +101,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 40),
                 const _BrandTitle(),
                 const SizedBox(height: 8),
-                const Text('Вход через Telegram', style: TextStyle(color: Colors.white70)),
+                Text(widget.title, style: const TextStyle(color: Colors.white70)),
                 const SizedBox(height: 32),
                 Pinput(
                   controller: _pinController,
@@ -161,21 +151,6 @@ class _LoginScreenState extends State<LoginScreen> {
                     icon: const Icon(Icons.telegram),
                     label: const Text('Получить код в Telegram'),
                   ),
-                ),
-                const SizedBox(height: 12),
-                SizedBox(
-                  width: double.infinity,
-                  child: OutlinedButton(
-                    onPressed: _busy ? null : _emergency,
-                    child: const Text('🆘 Аварийный профиль на 1 ч'),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Аварийный: бот создаёт профиль сразу, без VPN.\n'
-                  'С кодом — вход; без кода — откроется бот.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white54, fontSize: 11),
                 ),
                 const Spacer(),
               ],

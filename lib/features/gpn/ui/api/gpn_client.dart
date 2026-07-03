@@ -120,6 +120,30 @@ class GpnAuthSession {
       );
 }
 
+class GpnAppInfo {
+  GpnAppInfo({
+    required this.botUsername,
+    required this.trialDays,
+    this.supportChatUrl,
+    this.vkUrl,
+    this.telegramUrl,
+  });
+
+  final String botUsername;
+  final int trialDays;
+  final String? supportChatUrl;
+  final String? vkUrl;
+  final String? telegramUrl;
+
+  factory GpnAppInfo.fromJson(Map<String, dynamic> j) => GpnAppInfo(
+        botUsername: j['bot_username']?.toString() ?? '',
+        trialDays: (j['trial_days'] as num?)?.toInt() ?? 2,
+        supportChatUrl: j['support_chat_url']?.toString(),
+        vkUrl: j['vk_url']?.toString(),
+        telegramUrl: j['telegram_url']?.toString(),
+      );
+}
+
 class GpnEmergencyStatus {
   GpnEmergencyStatus({required this.canIssue, this.nextAvailableAt, required this.cooldownHours});
   final bool canIssue;
@@ -143,16 +167,72 @@ class GpnApiException implements Exception {
 }
 
 class GpnClient {
-  GpnClient({this.baseUrl = kApiBase, this.appToken});
+  GpnClient({this.baseUrl = kApiBase, this.appToken, this.deviceId});
 
   final String baseUrl;
   String? appToken;
+  final String? deviceId;
 
   Map<String, String> _headers({bool json = false}) {
     return <String, String>{
       if (json) 'Content-Type': 'application/json',
       if (appToken != null && appToken!.isNotEmpty) 'X-App-Token': appToken!,
+      if (deviceId != null && deviceId!.isNotEmpty) 'X-GPN-Device-Id': deviceId!,
     };
+  }
+
+  Future<GpnAppInfo> fetchAppInfo() async {
+    final r = await http.get(Uri.parse('$baseUrl/app/ping'));
+    if (r.statusCode != 200) throw GpnApiException('ping ${r.statusCode}');
+    return GpnAppInfo.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<GpnAuthSession> register() async {
+    final r = await http.post(
+      Uri.parse('$baseUrl/app/register'),
+      headers: _headers(json: true),
+      body: '{}',
+    );
+    if (r.statusCode != 200) {
+      throw GpnApiException(_errorBody(r.body) ?? 'register ${r.statusCode}', statusCode: r.statusCode);
+    }
+    return GpnAuthSession.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<GpnAuthSession> startTrial() async {
+    final r = await http.post(
+      Uri.parse('$baseUrl/app/trial'),
+      headers: _headers(json: true),
+      body: '{}',
+    );
+    if (r.statusCode == 409) {
+      throw GpnApiException('Пробный период уже использован', statusCode: 409);
+    }
+    if (r.statusCode != 200) {
+      throw GpnApiException(_errorBody(r.body) ?? 'trial ${r.statusCode}', statusCode: r.statusCode);
+    }
+    return GpnAuthSession.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  Future<GpnAuthSession> startEmergencyGuest() async {
+    final r = await http.post(
+      Uri.parse('$baseUrl/app/emergency/guest'),
+      headers: _headers(json: true),
+      body: '{}',
+    );
+    if (r.statusCode == 429) {
+      throw GpnApiException('Аварийный доступ: раз в сутки', statusCode: 429);
+    }
+    if (r.statusCode != 200) {
+      throw GpnApiException(_errorBody(r.body) ?? 'emergency ${r.statusCode}', statusCode: r.statusCode);
+    }
+    return GpnAuthSession.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  static String? _errorBody(String body) {
+    final t = body.trim();
+    if (t.isEmpty) return null;
+    return t.length > 200 ? t.substring(0, 200) : t;
   }
 
   Future<bool> ping() async {
