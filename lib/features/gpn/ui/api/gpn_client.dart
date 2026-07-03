@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+
 import 'package:http/http.dart' as http;
 import '../config.dart';
 
@@ -114,7 +116,7 @@ class GpnAuthSession {
   factory GpnAuthSession.fromJson(Map<String, dynamic> j) => GpnAuthSession(
         token: j['token']?.toString() ?? '',
         expiresAt: j['expires_at']?.toString() ?? j['session_expires_at']?.toString() ?? '',
-        telegramId: (j['telegram_id'] as num?)?.toInt() ?? 0,
+        telegramId: GpnClient.parseTelegramId(j['telegram_id']),
         subscriptionUrl: j['subscription_url']?.toString(),
         profileExpiresAt: j['expires_at']?.toString(),
       );
@@ -206,7 +208,22 @@ class GpnClient {
       body: '{}',
     );
     if (r.statusCode == 409) {
-      throw GpnApiException('Пробный период уже использован', statusCode: 409);
+      throw GpnApiException(
+        _errorBody(r.body) ?? 'Пробный период уже использован на этом устройстве',
+        statusCode: 409,
+      );
+    }
+    if (r.statusCode == 503) {
+      throw GpnApiException(
+        _errorBody(r.body) ?? 'Пробный период временно недоступен',
+        statusCode: 503,
+      );
+    }
+    if (r.statusCode == 400) {
+      throw GpnApiException(
+        _errorBody(r.body) ?? 'Не удалось определить устройство',
+        statusCode: 400,
+      );
     }
     if (r.statusCode != 200) {
       throw GpnApiException(_errorBody(r.body) ?? 'trial ${r.statusCode}', statusCode: r.statusCode);
@@ -233,6 +250,12 @@ class GpnClient {
     final t = body.trim();
     if (t.isEmpty) return null;
     return t.length > 200 ? t.substring(0, 200) : t;
+  }
+
+  static int parseTelegramId(dynamic raw) {
+    if (raw == null) return 0;
+    if (raw is int) return raw;
+    return int.tryParse(raw.toString()) ?? 0;
   }
 
   Future<bool> ping() async {

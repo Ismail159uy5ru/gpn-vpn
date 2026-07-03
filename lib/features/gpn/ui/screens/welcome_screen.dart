@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/screens/login_screen.dart';
@@ -6,7 +8,7 @@ import 'package:hiddify/features/gpn/ui/services/session_store.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-typedef WelcomeLoggedInCallback = void Function(
+typedef WelcomeLoggedInCallback = Future<void> Function(
   String token, {
   int? telegramId,
   String? subscriptionUrl,
@@ -53,7 +55,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
     try {
       final session = await (await _client()).startTrial();
-      widget.onLoggedIn(
+      await widget.onLoggedIn(
         session.token,
         telegramId: session.telegramId,
         subscriptionUrl: session.subscriptionUrl,
@@ -61,8 +63,10 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
       );
     } on GpnApiException catch (e) {
       setState(() => _error = e.message);
-    } catch (_) {
-      setState(() => _error = 'Не удалось активировать пробный период');
+    } on SocketException catch (e) {
+      setState(() => _error = 'Нет сети. Проверьте интернет эмулятора: ${e.message}');
+    } catch (e) {
+      setState(() => _error = 'Не удалось активировать пробный период: $e');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -75,7 +79,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
     try {
       final session = await (await _client()).startEmergencyGuest();
-      widget.onLoggedIn(
+      await widget.onLoggedIn(
         session.token,
         telegramId: session.telegramId,
         subscriptionUrl: session.subscriptionUrl,
@@ -110,9 +114,9 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
         MaterialPageRoute(
           builder: (ctx) => LoginScreen(
             title: 'Вход в подписку',
-            onLoggedIn: (token, {telegramId, subscriptionUrl}) {
+            onLoggedIn: (token, {telegramId, subscriptionUrl}) async {
               Navigator.of(ctx).pop();
-              widget.onLoggedIn(
+              await widget.onLoggedIn(
                 token,
                 telegramId: telegramId,
                 subscriptionUrl: subscriptionUrl,
@@ -131,7 +135,7 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
     });
     try {
       final session = await (await _client()).register();
-      widget.onLoggedIn(
+      await widget.onLoggedIn(
         session.token,
         telegramId: session.telegramId,
         kind: GpnSessionKind.cabinet,
