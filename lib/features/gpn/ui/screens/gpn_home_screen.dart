@@ -3,6 +3,10 @@ import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_card.dart';
+import 'package:hiddify/features/gpn/ui/widgets/gpn_proxy_footer.dart';
+import 'package:hiddify/features/home/widget/connection_button.dart';
+import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
+import 'package:hiddify/features/proxy/active/active_proxy_delay_indicator.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
 class GpnHomeScreen extends ConsumerStatefulWidget {
@@ -37,8 +41,9 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
       final st = await widget.client.fetchState();
       if (!mounted) return;
       setState(() => _state = st);
-      if (st.hasActiveSub && st.subscriptionUrl.isNotEmpty) {
-        final err = await GpnVpnBridge.importSubscription(ref, st.subscriptionUrl);
+      final url = st.subscriptionUrl.trim();
+      if (url.isNotEmpty) {
+        final err = await GpnVpnBridge.importSubscription(ref, url);
         if (!mounted) return;
         if (err != null) setState(() => _importError = err);
       }
@@ -50,43 +55,32 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
     }
   }
 
-  Future<void> _toggleVpn() async {
-    if (GpnVpnBridge.isConnected(ref)) {
-      await GpnVpnBridge.disconnect(ref);
-      return;
-    }
-    final url = _state?.subscriptionUrl ?? '';
+  Future<void> _importProfile() async {
+    final url = _state?.subscriptionUrl.trim() ?? '';
     if (url.isEmpty) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Нет профиля. Используйте аварийный доступ или купите подписку.')),
+        const SnackBar(content: Text('Нет ссылки подписки. Оформите trial или подписку.')),
       );
       return;
     }
+    setState(() => _importError = null);
     final err = await GpnVpnBridge.importSubscription(ref, url);
     if (!mounted) return;
     if (err != null) {
+      setState(() => _importError = err);
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(err)));
-      return;
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Профиль обновлён')),
+      );
     }
-    await GpnVpnBridge.connect(ref);
-  }
-
-  bool get _hasProfile => _state?.hasActiveSub == true && (_state?.subscriptionUrl.isNotEmpty ?? false);
-
-  bool get _connected => GpnVpnBridge.isConnected(ref);
-
-  bool get _connecting => GpnVpnBridge.isSwitching(ref);
-
-  String get _profileLabel {
-    if (_connected) return 'VPN включён';
-    if (_hasProfile) return 'Профиль готов';
-    if (_state?.hasActiveSub == true) return 'Подписка активна';
-    return 'Нет подписки';
   }
 
   @override
   Widget build(BuildContext context) {
-    final connErr = GpnVpnBridge.connectionError(ref);
+    final hasProfile = ref.watch(hasAnyProfileProvider).value ?? false;
+    final activeProfile = ref.watch(activeProfileProvider);
 
     return GpnBackground(
       child: Scaffold(
@@ -119,7 +113,16 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
         body: _loading
             ? const Center(child: CircularProgressIndicator())
             : _error != null
-                ? Center(child: Text(_error!))
+                ? Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(_error!),
+                        const SizedBox(height: 12),
+                        FilledButton(onPressed: _reload, child: const Text('Повторить')),
+                      ],
+                    ),
+                  )
                 : RefreshIndicator(
                     onRefresh: _reload,
                     child: ListView(
@@ -129,107 +132,42 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(_profileLabel, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-                              if (_hasProfile)
-                                const Text('Импортирован в ядро VPN', style: TextStyle(color: Color(0xFF8B5CF6), fontSize: 12)),
+                              Text(
+                                _state?.hasActiveSub == true ? 'Подписка активна' : 'Нет активной подписки',
+                                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
+                              ),
+                              Text(
+                                '${_state?.daysLeft ?? 0} дн. · профиль ${hasProfile ? "загружен" : "не загружен"}',
+                                style: const TextStyle(color: Colors.white54, fontSize: 12),
+                              ),
+                              if (!hasProfile && (_state?.subscriptionUrl.isNotEmpty ?? false)) ...[
+                                const SizedBox(height: 12),
+                                FilledButton.icon(
+                                  onPressed: _importProfile,
+                                  icon: const Icon(Icons.download),
+                                  label: const Text('Загрузить профиль'),
+                                ),
+                              ],
                             ],
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                        _VpnConnectButton(
-                          connected: _connected,
-                          connecting: _connecting,
-                          ready: _hasProfile,
-                          onTap: _toggleVpn,
-                        ),
-                        const SizedBox(height: 8),
-                        Center(
-                          child: Text(
-                            _connected
-                                ? 'Отключить'
-                                : _hasProfile
-                                    ? 'Подключить VPN'
-                                    : 'Сначала получите профиль',
-                            style: TextStyle(color: _hasProfile ? Colors.white70 : Colors.white38),
                           ),
                         ),
                         const SizedBox(height: 24),
-                        Container(
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(16),
-                            gradient: const LinearGradient(colors: [Color(0xFF9333EA), Color(0xFF7C3AED), Color(0xFF6D28D9)]),
-                          ),
-                          padding: const EdgeInsets.all(20),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text('Подписка', style: TextStyle(color: Color(0xFFE9D5FF), fontSize: 12)),
-                              Text(
-                                '${_state?.daysLeft ?? 0} дней',
-                                style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
-                              ),
-                              Text(
-                                _state?.hasActiveSub == true
-                                    ? 'Профиль на сервере — VPN по желанию'
-                                    : 'Оплата или аварийный доступ',
-                                style: const TextStyle(color: Color(0xFFE9D5FF), fontSize: 12),
-                              ),
-                            ],
-                          ),
-                        ),
-                        if (_importError != null || connErr != null) ...[
+                        const Center(child: ConnectionButton()),
+                        const SizedBox(height: 8),
+                        const Center(child: ActiveProxyDelayIndicator()),
+                        const SizedBox(height: 24),
+                        const GpnProxyFooter(),
+                        if (_importError != null) ...[
                           const SizedBox(height: 12),
-                          Text(
-                            _importError ?? connErr ?? '',
-                            style: const TextStyle(color: Colors.redAccent, fontSize: 12),
-                          ),
+                          Text(_importError!, style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
+                        ],
+                        if (activeProfile case AsyncError(:final error)) ...[
+                          const SizedBox(height: 12),
+                          Text(error.toString(), style: const TextStyle(color: Colors.redAccent, fontSize: 12)),
                         ],
                       ],
                     ),
                   ),
-      ),
-    );
-  }
-}
-
-class _VpnConnectButton extends StatelessWidget {
-  const _VpnConnectButton({
-    required this.connected,
-    required this.connecting,
-    required this.ready,
-    required this.onTap,
-  });
-
-  final bool connected;
-  final bool connecting;
-  final bool ready;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    final color = connected
-        ? const Color(0xFF22C55E)
-        : ready
-            ? const Color(0xFF8B5CF6)
-            : const Color(0xFF4B5563);
-    return Center(
-      child: GestureDetector(
-        onTap: connecting || !ready ? null : onTap,
-        child: Container(
-          width: 160,
-          height: 160,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: color.withValues(alpha: 0.15),
-            border: Border.all(color: color, width: 3),
-            boxShadow: ready ? [BoxShadow(color: color.withValues(alpha: 0.45), blurRadius: 40, spreadRadius: 4)] : null,
-          ),
-          child: Center(
-            child: connecting
-                ? const CircularProgressIndicator()
-                : Icon(connected ? Icons.power_settings_new : Icons.shield, size: 64, color: color),
-          ),
-        ),
       ),
     );
   }

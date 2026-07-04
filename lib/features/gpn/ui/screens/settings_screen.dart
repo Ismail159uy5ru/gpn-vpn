@@ -4,10 +4,8 @@ import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_card.dart';
-import 'package:hiddify/features/settings/overview/settings_page.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 import 'package:qr_flutter/qr_flutter.dart';
-
 class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key, required this.client});
 
@@ -72,11 +70,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  void _openAdvancedVpnSettings() {
-    Navigator.of(context).push(
-      MaterialPageRoute<void>(builder: (_) => SettingsPage()),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -145,21 +138,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                     ),
                   ),
                   const SizedBox(height: 24),
-                  const Text('Расширенные настройки VPN', style: TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold)),
+                  const Text('Справка', style: TextStyle(color: Color(0xFF8B5CF6), fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
                   GpnCard(
                     child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.stretch,
-                      children: [
-                        const Text(
-                          'DNS, маршрутизация, режим туннеля, per-app proxy — как в Hiddify.',
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text(
+                          'DNS, маршрутизация и режим туннеля — в системных настройках Android VPN.',
                           style: TextStyle(color: Colors.white54, height: 1.4),
                         ),
-                        const SizedBox(height: 12),
-                        OutlinedButton.icon(
-                          onPressed: _openAdvancedVpnSettings,
-                          icon: const Icon(Icons.tune),
-                          label: const Text('Открыть настройки VPN'),
+                        SizedBox(height: 8),
+                        Text(
+                          'Выбор сервера — на вкладке VPN → «Выбрать сервер».',
+                          style: TextStyle(color: Colors.white54, height: 1.4),
                         ),
                       ],
                     ),
