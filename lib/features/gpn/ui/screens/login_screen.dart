@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
+import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 
 typedef GpnLoggedInCallback = void Function(
@@ -27,6 +27,7 @@ class LoginScreen extends StatefulWidget {
 
 class _LoginScreenState extends State<LoginScreen> {
   final _pinController = TextEditingController();
+  final _deviceId = DeviceIdStore();
   bool _busy = false;
   String? _error;
   String? _botUsername;
@@ -62,7 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
       _error = null;
     });
     try {
-      final session = await call(GpnClient());
+      final id = await _deviceId.getOrCreate();
+      final session = await call(GpnClient(deviceId: id));
       if (session.token.isEmpty) throw Exception('empty');
       final sub = session.subscriptionUrl ?? '';
       widget.onLoggedIn(

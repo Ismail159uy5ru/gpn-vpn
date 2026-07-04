@@ -10,8 +10,8 @@ import 'package:hooks_riverpod/hooks_riverpod.dart';
 class GpnVpnBridge {
   GpnVpnBridge._();
 
-  static Future<String?> importSubscription(WidgetRef ref, String url) async {
-    final trimmed = url.trim();
+  static Future<String?> importSubscription(WidgetRef ref, String url, {String? deviceId}) async {
+    final trimmed = withDeviceId(url.trim(), deviceId);
     if (trimmed.isEmpty) return 'Нет ссылки подписки';
 
     final repo = ref.read(profileRepositoryProvider).requireValue;
@@ -24,7 +24,7 @@ class GpnVpnBridge {
         .run();
 
     if (result.isLeft()) {
-      return 'Не удалось импортировать профиль';
+      return 'Не удалось импортировать профиль. Проверьте лимит устройств в кабинете.';
     }
 
     final entry = await ref.read(profileDataSourceProvider).getByUrl(trimmed);
@@ -32,6 +32,15 @@ class GpnVpnBridge {
       await repo.setAsActive(entry.id).run();
     }
     return null;
+  }
+
+  /// Пробрасывает device_id в /subp для учёта слота устройства.
+  static String withDeviceId(String url, String? deviceId) {
+    final id = deviceId?.trim() ?? '';
+    if (id.isEmpty || !url.contains('/subp/')) return url;
+    final uri = Uri.parse(url);
+    if (uri.queryParameters.containsKey('did')) return url;
+    return uri.replace(queryParameters: {...uri.queryParameters, 'did': id}).toString();
   }
 
   static Future<void> connect(WidgetRef ref) async {
@@ -76,5 +85,14 @@ class GpnVpnBridge {
       }
     }
     return null;
+  }
+
+  /// Пробрасывает device_id в /subp для учёта слота устройства.
+  static String withDeviceId(String url, String? deviceId) {
+    final id = deviceId?.trim() ?? '';
+    if (id.isEmpty || !url.contains('/subp/')) return url;
+    final uri = Uri.parse(url);
+    if (uri.queryParameters.containsKey('did')) return url;
+    return uri.replace(queryParameters: {...uri.queryParameters, 'did': id}).toString();
   }
 }

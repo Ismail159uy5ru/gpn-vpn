@@ -55,16 +55,24 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
       kind: kind,
       emergencyUrl: kind == GpnSessionKind.emergency ? subscriptionUrl : null,
     );
-    if (subscriptionUrl != null && subscriptionUrl.isNotEmpty) {
+    final deviceId = await _deviceId.getOrCreate();
+    var sub = subscriptionUrl?.trim() ?? '';
+    if (sub.isEmpty && kind == GpnSessionKind.cabinet) {
+      try {
+        final st = await GpnClient(appToken: token, deviceId: deviceId).fetchState();
+        sub = st.subscriptionUrl.trim();
+      } catch (_) {}
+    }
+    if (sub.isNotEmpty) {
       if (kind == GpnSessionKind.emergency) {
         setState(() {
           _token = token;
           _kind = kind;
-          _emergencyUrl = subscriptionUrl;
+          _emergencyUrl = sub;
         });
         return;
       }
-      await GpnVpnBridge.importSubscription(ref, subscriptionUrl);
+      await GpnVpnBridge.importSubscription(ref, sub, deviceId: deviceId);
     }
     if (!mounted) return;
     setState(() {

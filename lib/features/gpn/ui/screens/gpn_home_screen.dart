@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
+import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_card.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_connection_button.dart';
@@ -20,6 +21,7 @@ class GpnHomeScreen extends ConsumerStatefulWidget {
 }
 
 class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
+  final _deviceId = DeviceIdStore();
   GpnState? _state;
   bool _loading = true;
   String? _error;
@@ -43,7 +45,8 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
       setState(() => _state = st);
       final url = st.subscriptionUrl.trim();
       if (url.isNotEmpty) {
-        final err = await GpnVpnBridge.importSubscription(ref, url);
+        final did = await _deviceId.getOrCreate();
+        final err = await GpnVpnBridge.importSubscription(ref, url, deviceId: did);
         if (!mounted) return;
         if (err != null) setState(() => _importError = err);
       }
@@ -65,7 +68,8 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
       return;
     }
     setState(() => _importError = null);
-    final err = await GpnVpnBridge.importSubscription(ref, url);
+    final did = await _deviceId.getOrCreate();
+    final err = await GpnVpnBridge.importSubscription(ref, url, deviceId: did);
     if (!mounted) return;
     if (err != null) {
       setState(() => _importError = err);
