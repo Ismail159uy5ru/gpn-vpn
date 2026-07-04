@@ -3,8 +3,8 @@ import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_card.dart';
+import 'package:hiddify/features/gpn/ui/widgets/gpn_connection_button.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_proxy_footer.dart';
-import 'package:hiddify/features/home/widget/connection_button.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_delay_indicator.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -152,7 +152,7 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Center(child: ConnectionButton()),
+                        const Center(child: GpnConnectionButton()),
                         const SizedBox(height: 8),
                         const Center(child: ActiveProxyDelayIndicator()),
                         const SizedBox(height: 24),
