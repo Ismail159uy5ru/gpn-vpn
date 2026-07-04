@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:pinput/pinput.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 
-typedef GpnLoggedInCallback = void Function(
+typedef GpnLoggedInCallback = Future<void> Function(
   String token, {
   int? telegramId,
   String? subscriptionUrl,
@@ -29,6 +30,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final _pinController = TextEditingController();
   final _deviceId = DeviceIdStore();
   bool _busy = false;
+  bool _loginInFlight = false;
   String? _error;
   String? _botUsername;
 
@@ -48,6 +50,7 @@ class _LoginScreenState extends State<LoginScreen> {
   String get _code => _pinController.text.trim();
 
   Future<void> _login() async {
+    if (_loginInFlight || _busy) return;
     if (_code.length != 6) {
       setState(() => _error = 'Введите 6 цифр из бота');
       return;
@@ -58,25 +61,34 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _finishAuth(
     Future<GpnAuthSession> Function(GpnClient) call,
   ) async {
+    if (_loginInFlight) return;
+    _loginInFlight = true;
     setState(() {
       _busy = true;
       _error = null;
     });
+    var loggedIn = false;
     try {
       final id = await _deviceId.getOrCreate();
       final session = await call(GpnClient(deviceId: id));
       if (session.token.isEmpty) throw Exception('empty');
       final sub = session.subscriptionUrl ?? '';
-      widget.onLoggedIn(
+      await widget.onLoggedIn(
         session.token,
         telegramId: session.telegramId,
         subscriptionUrl: sub.isNotEmpty ? sub : null,
       );
+      loggedIn = true;
     } on GpnApiException catch (e) {
-      setState(() => _error = e.message);
+      if (!loggedIn && mounted) {
+        setState(() => _error = e.message);
+      }
     } catch (_) {
-      setState(() => _error = 'Не удалось. Запросите новый код в боте.');
+      if (!loggedIn && mounted) {
+        setState(() => _error = 'Не удалось. Запросите новый код в боте.');
+      }
     } finally {
+      _loginInFlight = false;
       if (mounted) setState(() => _busy = false);
     }
   }
@@ -130,7 +142,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       border: Border.all(color: const Color(0xFF8B5CF6), width: 2),
                     ),
                   ),
-                  onCompleted: (_) => _login(),
+                  onCompleted: (_) {
+                    if (!_loginInFlight && !_busy) _login();
+                  },
                 ),
                 const SizedBox(height: 16),
                 if (_error != null)

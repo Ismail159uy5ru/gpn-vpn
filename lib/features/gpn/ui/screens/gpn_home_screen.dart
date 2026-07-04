@@ -30,10 +30,13 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
   @override
   void initState() {
     super.initState();
-    _reload();
+    // Всегда перекачиваем: upsert обновляет профиль и убирает Happ serverDescription из кэша.
+    _loadCabinet(forceImport: true);
   }
 
-  Future<void> _reload() async {
+  Future<void> _reload() => _loadCabinet(forceImport: true);
+
+  Future<void> _loadCabinet({bool forceImport = false}) async {
     setState(() {
       _loading = true;
       _error = null;
@@ -44,11 +47,13 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
       if (!mounted) return;
       setState(() => _state = st);
       final url = st.subscriptionUrl.trim();
-      if (url.isNotEmpty) {
+      if (forceImport && url.isNotEmpty) {
         final did = await _deviceId.getOrCreate();
         final err = await GpnVpnBridge.importSubscription(ref, url, deviceId: did);
         if (!mounted) return;
-        if (err != null) setState(() => _importError = err);
+        if (err != null) {
+          setState(() => _importError = err);
+        }
       }
     } catch (_) {
       if (!mounted) return;

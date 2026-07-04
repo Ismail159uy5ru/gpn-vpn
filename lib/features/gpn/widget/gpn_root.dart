@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/features/gpn/service/gpn_profile_import.dart';
 import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/screens/emergency_vpn_screen.dart';
@@ -7,7 +8,6 @@ import 'package:hiddify/features/gpn/ui/screens/welcome_screen.dart';
 import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/services/session_store.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
-
 /// Стартовый экран → кабинет или аварийный VPN.
 class GpnRoot extends ConsumerStatefulWidget {
   const GpnRoot({super.key});
@@ -27,7 +27,11 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
   @override
   void initState() {
     super.initState();
-    _loadSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _bootstrap());
+  }
+
+  Future<void> _bootstrap() async {
+    await _loadSession();
   }
 
   Future<void> _loadSession() async {
@@ -55,35 +59,22 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
       kind: kind,
       emergencyUrl: kind == GpnSessionKind.emergency ? subscriptionUrl : null,
     );
-    final deviceId = await _deviceId.getOrCreate();
-    var sub = subscriptionUrl?.trim() ?? '';
-    if (sub.isEmpty && kind == GpnSessionKind.cabinet) {
-      try {
-        final st = await GpnClient(appToken: token, deviceId: deviceId).fetchState();
-        sub = st.subscriptionUrl.trim();
-      } catch (_) {}
-    }
-    if (sub.isNotEmpty) {
-      if (kind == GpnSessionKind.emergency) {
-        setState(() {
-          _token = token;
-          _kind = kind;
-          _emergencyUrl = sub;
-        });
-        return;
-      }
-      await GpnVpnBridge.importSubscription(ref, sub, deviceId: deviceId);
-    }
     if (!mounted) return;
     setState(() {
       _token = token;
       _kind = kind;
-      if (subscriptionUrl != null) _emergencyUrl = subscriptionUrl;
+      if (kind == GpnSessionKind.emergency) {
+        _emergencyUrl = subscriptionUrl?.trim() ?? '';
+      }
     });
+    _closeAuthOverlays();
+
+    if (kind == GpnSessionKind.emergency) return;
   }
 
   Future<void> _logout() async {
     await GpnVpnBridge.disconnect(ref);
+    await gpnClearAllProfiles(ref);
     await _session.clear();
     if (!mounted) return;
     setState(() {
@@ -96,6 +87,17 @@ class _GpnRootState extends ConsumerState<GpnRoot> {
   Future<GpnClient> _client() async {
     final id = await _deviceId.getOrCreate();
     return GpnClient(appToken: _token, deviceId: id);
+  }
+
+  /// LoginScreen пушится поверх Welcome — без pop кабинет остаётся под ним.
+  void _closeAuthOverlays() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      final nav = Navigator.of(context);
+      while (nav.canPop()) {
+        nav.pop();
+      }
+    });
   }
 
   @override

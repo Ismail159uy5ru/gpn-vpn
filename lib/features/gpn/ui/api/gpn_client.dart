@@ -296,6 +296,12 @@ class GpnClient {
       headers: _headers(json: true),
       body: jsonEncode({'code': code}),
     );
+    if (r.statusCode == 401) {
+      throw GpnApiException(
+        'Код неверный, уже использован или истёк. Запросите новый в боте.',
+        statusCode: 401,
+      );
+    }
     if (r.statusCode != 200) {
       throw GpnApiException('Неверный или просроченный код', statusCode: r.statusCode);
     }

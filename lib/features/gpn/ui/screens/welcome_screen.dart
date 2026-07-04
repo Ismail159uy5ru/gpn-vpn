@@ -115,13 +115,13 @@ class _WelcomeScreenState extends State<WelcomeScreen> {
           builder: (ctx) => LoginScreen(
             title: 'Вход в подписку',
             onLoggedIn: (token, {telegramId, subscriptionUrl}) async {
-              Navigator.of(ctx).pop();
               await widget.onLoggedIn(
                 token,
                 telegramId: telegramId,
                 subscriptionUrl: subscriptionUrl,
                 kind: GpnSessionKind.cabinet,
               );
+              if (ctx.mounted) Navigator.of(ctx).pop();
             },
           ),
         ),

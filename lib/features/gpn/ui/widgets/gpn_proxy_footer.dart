@@ -3,6 +3,7 @@ import 'package:hiddify/core/localization/translations.dart';
 import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/gpn/ui/screens/gpn_proxies_screen.dart';
+import 'package:hiddify/features/gpn/ui/widgets/gpn_proxy_label.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
 
@@ -41,7 +42,7 @@ class GpnProxyFooter extends ConsumerWidget {
                   children: [
                     Text(
                       connectionState == const Connected() && activeProxy != null
-                          ? activeProxy.tagDisplay
+                          ? gpnProxyDisplayName(activeProxy.tagDisplay)
                           : 'Выбрать сервер',
                       style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w600),
                       maxLines: 1,

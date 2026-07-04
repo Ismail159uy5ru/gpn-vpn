@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:hiddify/core/localization/translations.dart';
-import 'package:hiddify/features/connection/model/connection_status.dart';
 import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -44,7 +43,9 @@ class GpnConnectionButton extends ConsumerWidget {
         );
         return;
       }
+      final wasConnected = connected;
       await ref.read(connectionNotifierProvider.notifier).toggleConnection();
+      if (wasConnected) return;
     }
 
     return Column(
