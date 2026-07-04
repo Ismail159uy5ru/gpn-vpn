@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:hiddify/core/localization/translations.dart';
+import 'package:hiddify/features/connection/model/connection_status.dart';
+import 'package:hiddify/features/connection/notifier/connection_notifier.dart';
 import 'package:hiddify/features/gpn/service/gpn_vpn_bridge.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_card.dart';
-import 'package:hiddify/features/gpn/ui/widgets/gpn_connection_button.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_proxy_footer.dart';
+import 'package:hiddify/features/home/widget/connection_button.dart';
 import 'package:hiddify/features/profile/notifier/active_profile_notifier.dart';
 import 'package:hiddify/features/proxy/active/active_proxy_delay_indicator.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
@@ -88,6 +91,19 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen(connectionNotifierProvider, (prev, next) {
+      if (!mounted) return;
+      if (next case AsyncData(value: Disconnected(:final connectionFailure?))) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(connectionFailure.toString())),
+        );
+      } else if (next case AsyncError(:final error)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(error.toString())),
+        );
+      }
+    });
+
     final hasProfile = ref.watch(hasAnyProfileProvider).value ?? false;
     final activeProfile = ref.watch(activeProfileProvider);
 
@@ -161,7 +177,7 @@ class _GpnHomeScreenState extends ConsumerState<GpnHomeScreen> {
                           ),
                         ),
                         const SizedBox(height: 24),
-                        const Center(child: GpnConnectionButton()),
+                        const Center(child: ConnectionButton()),
                         const SizedBox(height: 8),
                         const Center(child: ActiveProxyDelayIndicator()),
                         const SizedBox(height: 24),
