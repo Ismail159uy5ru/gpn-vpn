@@ -31,7 +31,7 @@ class GpnConnectionButton extends ConsumerWidget {
     } else if (connected) {
       label = t.connection.connected;
     } else if (hasProfile) {
-      label = t.connection.disconnected;
+      label = t.connection.connect;
     } else {
       label = 'Загрузите профиль';
     }
