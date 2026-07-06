@@ -4,6 +4,7 @@ import 'package:pinput/pinput.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:hiddify/features/gpn/ui/api/gpn_client.dart';
 import 'package:hiddify/features/gpn/ui/services/device_id_store.dart';
+import 'package:hiddify/features/gpn/ui/config.dart';
 import 'package:hiddify/features/gpn/ui/widgets/gpn_background.dart';
 
 typedef GpnLoggedInCallback = Future<void> Function(
@@ -41,10 +42,8 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _loadBotUsername() async {
-    try {
-      final name = await GpnClient().fetchBotUsername();
-      if (mounted) setState(() => _botUsername = name);
-    } catch (_) {}
+    final name = await GpnClient().fetchBotUsername();
+    if (mounted) setState(() => _botUsername = name);
   }
 
   String get _code => _pinController.text.trim();
@@ -94,12 +93,18 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _openTelegram({required String start}) async {
-    final user = _botUsername;
-    if (user == null || user.isEmpty) {
+    final user = (_botUsername ?? kDefaultBotUsername).replaceAll('@', '').trim();
+    if (user.isEmpty) {
       setState(() => _error = 'Не удалось открыть бота');
       return;
     }
-    await launchUrl(Uri.parse('https://t.me/$user?start=$start'), mode: LaunchMode.externalApplication);
+    final ok = await launchUrl(
+      Uri.parse('https://t.me/$user?start=$start'),
+      mode: LaunchMode.externalApplication,
+    );
+    if (!ok && mounted) {
+      setState(() => _error = 'Не удалось открыть Telegram. Установите Telegram или введите код вручную.');
+    }
   }
 
   @override

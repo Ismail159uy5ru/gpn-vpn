@@ -264,10 +264,15 @@ class GpnClient {
   }
 
   Future<String> fetchBotUsername() async {
-    final r = await http.get(Uri.parse('$baseUrl/app/ping'));
-    if (r.statusCode != 200) return '';
-    final j = jsonDecode(r.body) as Map<String, dynamic>;
-    return j['bot_username']?.toString() ?? '';
+    try {
+      final r = await http.get(Uri.parse('$baseUrl/app/ping'));
+      if (r.statusCode == 200) {
+        final j = jsonDecode(r.body) as Map<String, dynamic>;
+        final u = j['bot_username']?.toString().trim() ?? '';
+        if (u.isNotEmpty) return u;
+      }
+    } catch (_) {}
+    return kDefaultBotUsername;
   }
 
   Future<List<GpnPlan>> fetchPlans() async {
